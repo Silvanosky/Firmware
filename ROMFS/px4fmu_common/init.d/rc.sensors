@@ -265,7 +265,7 @@ then
 	mpu9250 -s -R 14 start
 
 	# Possible external compasses
-	hmc5883 -X start
+	hmc5883 -C -T -X start
 
 	ist8310 -C -b 1 -R 4 start
 	aerofc_adc start
