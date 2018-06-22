@@ -79,17 +79,15 @@
 #include <sys/statfs.h>
 #endif
 
+#include <airspeed/airspeed.h>
+#include <ecl/geo/geo.h>
 #include <mathlib/mathlib.h>
-
 #include <conversion/rotation.h>
-
 #include <parameters/param.h>
-#include <systemlib/systemlib.h>
 #include <systemlib/mavlink_log.h>
 #include <systemlib/err.h>
-#include <systemlib/airspeed.h>
+
 #include <commander/px4_custom_mode.h>
-#include <lib/ecl/geo/geo.h>
 
 #include <uORB/topics/vehicle_command_ack.h>
 
@@ -97,6 +95,8 @@
 #include "mavlink_receiver.h"
 #include "mavlink_main.h"
 #include "mavlink_command_sender.h"
+
+using matrix::wrap_2pi;
 
 MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_mavlink(parent),
@@ -1340,10 +1340,15 @@ MavlinkReceiver::handle_message_set_attitude_target(mavlink_message_t *msg)
 					att_sp.timestamp = hrt_absolute_time();
 
 					if (!ignore_attitude_msg) { // only copy att sp if message contained new data
-						mavlink_quaternion_to_euler(set_attitude_target.q, &att_sp.roll_body, &att_sp.pitch_body, &att_sp.yaw_body);
-						att_sp.yaw_sp_move_rate = 0.0;
-						memcpy(att_sp.q_d, set_attitude_target.q, sizeof(att_sp.q_d));
+						matrix::Quatf q(set_attitude_target.q);
+						q.copyTo(att_sp.q_d);
 						att_sp.q_d_valid = true;
+
+						matrix::Eulerf euler{q};
+						att_sp.roll_body = euler.phi();
+						att_sp.pitch_body = euler.theta();
+						att_sp.yaw_body = euler.psi();
+						att_sp.yaw_sp_move_rate = 0.0f;
 					}
 
 					if (!_offboard_control_mode.ignore_thrust) { // dont't overwrite thrust if it's invalid
@@ -2061,7 +2066,7 @@ MavlinkReceiver::handle_message_hil_gps(mavlink_message_t *msg)
 	hil_gps.vel_e_m_s = gps.ve * 1e-2f; // from cm to m
 	hil_gps.vel_d_m_s = gps.vd * 1e-2f; // from cm to m
 	hil_gps.vel_ned_valid = true;
-	hil_gps.cog_rad = _wrap_pi(gps.cog * M_DEG_TO_RAD_F * 1e-2f);
+	hil_gps.cog_rad = ((gps.cog == 65535) ? NAN : wrap_2pi(math::radians(gps.cog * 1e-2f)));
 
 	hil_gps.fix_type = gps.fix_type;
 	hil_gps.satellites_used = gps.satellites_visible;  //TODO: rename mavlink_hil_gps_t sats visible to used?
@@ -2312,8 +2317,10 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 		_hil_local_pos.yaw = euler.psi();
 		_hil_local_pos.xy_global = true;
 		_hil_local_pos.z_global = true;
-		_hil_local_pos.vxy_max = 0.0f;
-		_hil_local_pos.limit_hagl = false;
+		_hil_local_pos.vxy_max = INFINITY;
+		_hil_local_pos.vz_max = INFINITY;
+		_hil_local_pos.hagl_min = INFINITY;
+		_hil_local_pos.hagl_max = INFINITY;
 
 		if (_local_pos_pub == nullptr) {
 			_local_pos_pub = orb_advertise(ORB_ID(vehicle_local_position), &_hil_local_pos);

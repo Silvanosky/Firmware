@@ -68,7 +68,6 @@
 #include <parameters/param.h>
 #include <systemlib/err.h>
 #include <perf/perf_counter.h>
-#include <systemlib/systemlib.h>
 #include <systemlib/mavlink_log.h>
 #include <lib/ecl/geo/geo.h>
 #include <dataman/dataman.h>
@@ -260,6 +259,7 @@ Mavlink::Mavlink() :
 	_network_port(14556),
 	_remote_port(DEFAULT_REMOTE_PORT_UDP),
 	_rstatus {},
+	_ping_stats{},
 	_message_buffer {},
 	_message_buffer_mutex {},
 	_send_mutex {},
@@ -2063,8 +2063,6 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("POSITION_TARGET_LOCAL_NED", 10.0f);
 		configure_stream("RC_CHANNELS", 20.0f);
 		configure_stream("SCALED_IMU", 50.0f);
-		configure_stream("SCALED_IMU2", 50.0f);
-		configure_stream("SCALED_IMU3", 50.0f);
 		configure_stream("SERVO_OUTPUT_RAW_0", 10.0f);
 		configure_stream("SYS_STATUS", 5.0f);
 		configure_stream("SYSTEM_TIME", 1.0f);
